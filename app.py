@@ -1,25 +1,18 @@
 import streamlit as st
+import yfinance as yf
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from nsetools import Nse
-
-# Initialize NSE object
-nse = Nse()
 
 # Helper functions
-def fetch_data(ticker):
-    # Fetch stock data from NSE
+def fetch_data(ticker, start_date, end_date):
     try:
-        stock_info = nse.get_quote(ticker)
-        data = pd.DataFrame({
-            'Date': pd.to_datetime(stock_info['dayHighTime']),
-            'Close': [stock_info['dayHigh']]  # Only using the latest closing price
-        })
+        data = yf.download(ticker + ".NS", start=start_date, end=end_date)
+        data = data[['Close']]
         return data
     except Exception as e:
         st.error(f"Error fetching data for {ticker}: {e}")
-        return pd.DataFrame(columns=['Date', 'Close'])
+        return pd.DataFrame(columns=['Close'])
 
 def calc_return(price, length):
     return price.pct_change(periods=length).shift(-length)
@@ -57,7 +50,7 @@ length1m = st.slider("1-Month Period", min_value=1, max_value=50, value=21)  # A
 lookback = st.slider("Lookback Period", min_value=1, max_value=500, value=252)
 
 # Fetch data
-data = fetch_data(ticker)
+data = fetch_data(ticker, start_date, end_date)
 if data.empty:
     st.stop()
 
@@ -83,8 +76,8 @@ weighted_z_score = 0.5 * z_score_1m + 0.5 * z_score_15d
 
 # Calculate Normalized Momentum Score
 normalized_momentum_score = np.where(weighted_z_score >= 0, 
-                                         1 + weighted_z_score, 
-                                         1 / (1 - weighted_z_score))
+                                      1 + weighted_z_score, 
+                                      1 / (1 - weighted_z_score))
 
 # Plot results
 st.subheader("Normalized Momentum Score")
