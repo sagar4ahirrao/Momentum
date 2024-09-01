@@ -2,7 +2,6 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 
 # Helper functions
 def fetch_data(ticker, start_date, end_date):
@@ -56,7 +55,7 @@ if data.empty:
 
 # Calculate Momentum Ratios
 price = data['Close']
-price = price.reindex(pd.date_range(start=start_date, end=end_date, freq='B')).fillna(method='ffill')
+price = price.reindex(pd.date_range(start=start_date, end=end_date, freq='B')).ffill()
 
 stddev = calc_stddev(price, length1m)  # Using length1m for stddev calculation
 momentum_ratio_1m = calc_return(price, length1m) / stddev
@@ -74,18 +73,20 @@ z_score_15d = (momentum_ratio_15d - mean_mr15d) / std_mr15d
 # Calculate Weighted Average Z Score
 weighted_z_score = 0.5 * z_score_1m + 0.5 * z_score_15d
 
+# Ensure lengths match by dropping NaN values
+weighted_z_score = weighted_z_score.dropna()
+
 # Calculate Normalized Momentum Score
 normalized_momentum_score = np.where(weighted_z_score >= 0, 
                                       1 + weighted_z_score, 
                                       1 / (1 - weighted_z_score))
 
-# Plot results
-st.subheader("Normalized Momentum Score")
+# Ensure the DataFrame has matching lengths
+score_df = pd.DataFrame({
+    'Date': weighted_z_score.index,
+    'Normalized Momentum Score': normalized_momentum_score
+})
 
-fig, ax = plt.subplots(figsize=(10, 6))
-ax.plot(data.index, normalized_momentum_score, label='Normalized Momentum Score', color='blue')
-ax.set_xlabel('Date')
-ax.set_ylabel('Score')
-ax.set_title(f'Normalized Momentum Score for {ticker}')
-ax.legend()
-st.pyplot(fig)
+# Display the results in a table
+st.subheader(f"Normalized Momentum Score for {ticker}")
+st.dataframe(score_df.set_index('Date'))
