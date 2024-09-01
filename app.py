@@ -24,7 +24,7 @@ def calc_stddev(price, length):
 # Streamlit UI
 st.title("Normalized Momentum Score Calculator")
 
-# Dropdown list of Indian stock tickers
+# List of Indian stock tickers
 tickers = [
     'HUDCO', 'COCHINSHIP', 'ARE&M', 'EXIDEIND', 'CROMPTON', 'NATIONALUM', 'APARINDS', 'CDSL', 
     'GLENMARK', 'TITAGARH', 'MCX', 'NCC', 'HINDCOPPER', 'KARURVYSYA', 'NBCC', 'NAM-INDIA', 
@@ -40,7 +40,6 @@ tickers = [
     'WELSPUNLIV', 'BIRLACORPN', 'AVANTIFEED', 'BALAMINES', 'RHIM', 'VIPIND', 'SUNTECK', 'GAEL'
 ]
 
-ticker = st.selectbox("Select Stock Ticker", tickers)
 start_date = st.date_input("Start Date", pd.to_datetime("2022-01-01"))
 end_date = st.date_input("End Date", pd.to_datetime("today"))
 
@@ -48,45 +47,53 @@ length15d = st.slider("15-Day Period", min_value=1, max_value=50, value=15)
 length1m = st.slider("1-Month Period", min_value=1, max_value=50, value=21)  # Approx. 21 trading days
 lookback = st.slider("Lookback Period", min_value=1, max_value=500, value=252)
 
-# Fetch data
-data = fetch_data(ticker, start_date, end_date)
-if data.empty:
-    st.stop()
+# List to store results
+results = []
 
-# Calculate Momentum Ratios
-price = data['Close']
-price = price.reindex(pd.date_range(start=start_date, end=end_date, freq='B')).ffill()
+# Iterate through all tickers
+for ticker in tickers:
+    # Fetch data
+    data = fetch_data(ticker, start_date, end_date)
+    if data.empty:
+        continue
 
-stddev = calc_stddev(price, length1m)  # Using length1m for stddev calculation
-momentum_ratio_1m = calc_return(price, length1m) / stddev
-momentum_ratio_15d = calc_return(price, length15d) / stddev
+    # Calculate Momentum Ratios
+    price = data['Close']
+    price = price.reindex(pd.date_range(start=start_date, end=end_date, freq='B')).ffill()
 
-# Calculate Z-Scores
-mean_mr1m = momentum_ratio_1m.rolling(window=lookback).mean()
-std_mr1m = momentum_ratio_1m.rolling(window=lookback).std()
-mean_mr15d = momentum_ratio_15d.rolling(window=lookback).mean()
-std_mr15d = momentum_ratio_15d.rolling(window=lookback).std()
+    stddev = calc_stddev(price, length1m)  # Using length1m for stddev calculation
+    momentum_ratio_1m = calc_return(price, length1m) / stddev
+    momentum_ratio_15d = calc_return(price, length15d) / stddev
 
-z_score_1m = (momentum_ratio_1m - mean_mr1m) / std_mr1m
-z_score_15d = (momentum_ratio_15d - mean_mr15d) / std_mr15d
+    # Calculate Z-Scores
+    mean_mr1m = momentum_ratio_1m.rolling(window=lookback).mean()
+    std_mr1m = momentum_ratio_1m.rolling(window=lookback).std()
+    mean_mr15d = momentum_ratio_15d.rolling(window=lookback).mean()
+    std_mr15d = momentum_ratio_15d.rolling(window=lookback).std()
 
-# Calculate Weighted Average Z Score
-weighted_z_score = 0.5 * z_score_1m + 0.5 * z_score_15d
+    z_score_1m = (momentum_ratio_1m - mean_mr1m) / std_mr1m
+    z_score_15d = (momentum_ratio_15d - mean_mr15d) / std_mr15d
 
-# Ensure lengths match by dropping NaN values
-weighted_z_score = weighted_z_score.dropna()
+    # Calculate Weighted Average Z Score
+    weighted_z_score = 0.5 * z_score_1m + 0.5 * z_score_15d
 
-# Calculate Normalized Momentum Score
-normalized_momentum_score = np.where(weighted_z_score >= 0, 
-                                      1 + weighted_z_score, 
-                                      1 / (1 - weighted_z_score))
+    # Ensure lengths match by dropping NaN values
+    weighted_z_score = weighted_z_score.dropna()
 
-# Ensure the DataFrame has matching lengths
-score_df = pd.DataFrame({
-    'Date': weighted_z_score.index,
-    'Normalized Momentum Score': normalized_momentum_score
-})
+    # Calculate Normalized Momentum Score
+    normalized_momentum_score = np.where(weighted_z_score >= 0, 
+                                          1 + weighted_z_score, 
+                                          1 / (1 - weighted_z_score))
 
-# Display the results in a table
-st.subheader(f"Normalized Momentum Score for {ticker}")
-st.dataframe(score_df.set_index('Date'))
+    # Get the latest Normalized Momentum Score
+    if len(normalized_momentum_score) > 0:
+        latest_score = normalized_momentum_score[-1]
+        results.append({'Stock': ticker, 'Normalized Momentum Score': latest_score})
+
+# Convert results to DataFrame and display
+if results:
+    results_df = pd.DataFrame(results)
+    st.subheader("Latest Normalized Momentum Scores")
+    st.dataframe(results_df)
+else:
+    st.write("No data available for the selected date range.")
