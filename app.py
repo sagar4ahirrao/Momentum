@@ -30,8 +30,8 @@ tickers = ['360ONE','3MINDIA','ABB','ACC','AGI','AIAENG','APLAPOLLO','ASKAUTOLTD
 start_date = st.date_input("Start Date", pd.to_datetime("2022-01-01"))
 end_date = st.date_input("End Date", pd.to_datetime("today"))
 
-length15d = st.slider("15-Day Period", min_value=1, max_value=50, value=15)
-length1m = st.slider("1-Month Period", min_value=1, max_value=50, value=21)  # Approx. 21 trading days
+length15d = st.slider("ShortTerm Period", min_value=1, max_value=500, value=120)
+length1m = st.slider("LongTerm Period", min_value=1, max_value=500, value=252)  # Approx. 21 trading days
 lookback = st.slider("Lookback Period", min_value=1, max_value=500, value=252)
 
 # List to store results
